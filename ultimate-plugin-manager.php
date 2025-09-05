@@ -1,7 +1,7 @@
 <?php
 /*
 	Plugin Name: Ultimate Plugin Manager
-	Description: Protect your site by managing your plugins like a pro. Disables deactivation, deletion, and enforces auto-update status for protected plugins.
+	Description: Lock down mission-critical plugins: block deactivate/delete and hard-lock auto-updates ON or OFF from a simple settings page.
 	Version: 0.2.0
 	Author: Joe Thomas
 	Author URI: https://localboost.com
