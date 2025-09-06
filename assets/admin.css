@@ -1,37 +1,26 @@
-/* Ultimate Plugin Manager admin styles */
-.upm-wrap .upm-controls {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin: 12px 0 16px;
-	gap: 12px;
-}
-#upm-search {
-	min-width: 280px;
-	padding: 6px 10px;
-}
-.upm-legend {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	font-size: 13px;
-	color: #555;
-}
-.upm-badge {
-	display: inline-block;
-	padding: 0 6px;
-	border-radius: 2px;
-	font-size: 11px;
-	font-weight: 700;
-	line-height: 1.9;
-	transform: translateY(-1px);
-}
-.upm-badge-on { background: #11967A; color: #fff; }
-.upm-badge-off { background: #c42b1c; color: #fff; }
+/* Admin UI */
+.upm-wrap .upm-controls{display:flex;align-items:center;justify-content:space-between;margin:12px 0 16px;gap:12px}
+#upm-search{min-width:280px;padding:6px 10px}
+.upm-legend{display:flex;align-items:center;gap:10px;font-size:13px;color:#555}
+.upm-badge{display:inline-block;padding:0 6px;border-radius:2px;font-size:11px;font-weight:700;line-height:1.9;transform:translateY(-1px)}
+.upm-badge-on{background:#11967A;color:#fff}
+.upm-badge-off{background:#c42b1c;color:#fff}
 
-.upm-table .col-protected,
-.upm-table .col-on,
-.upm-table .col-off { width: 14%; text-align: center; }
+.upm-table .col-protected,.upm-table .col-on,.upm-table .col-off,.upm-table .col-freeze,.upm-table .col-rollback,.upm-table .col-notes{width:11%;text-align:center}
+.upm-table .col-freeze{width:16%;text-align:left}
+.upm-table .col-notes{width:22%;text-align:left}
+.upm-check{display:inline-flex;align-items:center;gap:6px}
+.upm-check input[type="checkbox"]{transform:translateY(1px)}
 
-.upm-check { display: inline-flex; align-items: center; gap: 6px; }
-.upm-check input[type="checkbox"] { transform: translateY(1px); }
+.nav-tab-wrapper .nav-tab{cursor:pointer}
+.upm-tab{margin-top:10px}
+
+.upm-gh-status .dashicons { vertical-align: -2px; margin-right: 4px; }
+.upm-gh-status.upm-wait { color: #555; }
+.upm-gh-status.upm-ok   { color: #0a7d40; }  /* green */
+.upm-gh-status.upm-bad  { color: #c42b1c; }  /* red */
+
+.upm-fav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.upm-fav-card{border:1px solid #e5e7eb;border-radius:6px;padding:12px;background:#fff}
+.upm-fav-card h3{margin:0 0 6px}
+.upm-fav-card .actions{margin-top:8px}

@@ -1,8 +1,8 @@
 <?php
 /*
 	Plugin Name: Ultimate Plugin Manager
-	Description: Lock down mission-critical plugins: block deactivate/delete and hard-lock auto-updates ON or OFF from a simple settings page.
-	Version: 0.2.0
+	Description: Lock down key plugins: prevent deactivate/delete, force auto-updates ON/OFF, freeze versions, rollback safely, and add admin notes—all from one screen.
+	Version: 0.3.0
 	Author: Joe Thomas
 	Author URI: https://localboost.com
 	Text Domain: ultimate-plugin-manager
@@ -15,7 +15,7 @@
 
 defined('ABSPATH') || exit;
 
-define('UPM_VERSION', '0.2.0');
+define('UPM_VERSION', '0.3.0');
 define('UPM_FILE', __FILE__);
 define('UPM_PATH', plugin_dir_path(__FILE__));
 define('UPM_URL',  plugin_dir_url(__FILE__));
@@ -23,32 +23,30 @@ define('UPM_URL',  plugin_dir_url(__FILE__));
 require_once UPM_PATH . 'includes/helpers.php';
 require_once UPM_PATH . 'includes/class-upm-core.php';
 require_once UPM_PATH . 'includes/class-upm-admin.php';
+require_once UPM_PATH . 'includes/class-upm-rollback.php';
+require_once UPM_PATH . 'includes/class-upm-vuln.php';
 
-/**
- * Activation: seed defaults if option not present.
- */
 register_activation_hook(__FILE__, function () {
 	if (false === get_option('upm_settings')) {
 		add_option('upm_settings', upm_default_settings(), false);
 	}
+	\UPM\Vuln::schedule();
 });
 
-/**
- * Bootstrap.
- */
-add_action('plugins_loaded', function () {
-	// Core protections & enforcement
-	\UPM\Core::init();
+register_deactivation_hook(__FILE__, function(){
+	\UPM\Vuln::unschedule();
+});
 
-	// Admin settings page
+add_action('plugins_loaded', function () {
+	\UPM\Core::init();
 	if (is_admin()) {
 		\UPM\Admin::init();
 	}
+	\UPM\Rollback::init();   // rename handling + safety checks
+	\UPM\Vuln::init();       // provider-agnostic vuln scan scaffold
 });
 
-/**
- * Add "Settings" link on the Plugins screen row.
- */
+// "Settings" link on Plugins list row
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($links) {
 	$settings_url = admin_url('options-general.php?page=upm-settings');
 	$links[] = '<a href="' . esc_url($settings_url) . '">' . esc_html__('Settings', 'ultimate-plugin-manager') . '</a>';
