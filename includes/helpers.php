@@ -20,14 +20,14 @@ function upm_default_settings() {
 			'elementor/elementor.php',
 			'elementor-pro/elementor-pro.php',
 		),
-		'freeze'     => array( /* 'plugin/file.php' => '1.2.3' */ ),
-		'notes'      => array( /* 'plugin/file.php' => [ 'text'=>'', 'type'=>'freeze|lock', 'author'=>0, 'time'=>0 ] */ ),
+		'freeze'     => array(), // 'plugin/file.php' => '1.2.3'
+		'notes'      => array(), // 'plugin/file.php' => [ 'text'=>'', 'type'=>'freeze|lock', 'author'=>0, 'time'=>0 ]
 		'vuln'       => array(
-			'provider'        => '',          // '', 'wpscan', 'patchstack', 'wordfence'
-			'api_key'         => '',
-			'severity'        => 'high',     // 'low','medium','high','critical'
-			'respect_freeze'  => true,       // do not auto-unfreeze to patch
-			'respect_wf_ignore' => true,     // if Wordfence is installed, honor ignored vulns
+			'provider'          => '',      // '', 'wpscan', 'patchstack', 'wordfence'
+			'api_key'           => '',
+			'severity'          => 'high',  // 'low','medium','high','critical'
+			'respect_freeze'    => true,    // do not auto-unfreeze to patch
+			'respect_wf_ignore' => true,    // if Wordfence is installed, honor ignored vulns
 		),
 		'network'    => array(
 			'policy' => array(
@@ -41,8 +41,32 @@ function upm_default_settings() {
 		'github' => array(
 			'token' => '', // optional personal access token for higher GitHub rate limits
 		),
-		'favorites' => array( /* DB-stored; merged with file */ ),
+		'favorites' => array(), // DB-stored; merged with file
 	);
+}
+
+/** ---------- helpers used by multiple places (GLOBAL, not nested) ---------- */
+
+/** Normalize favorite type into one of: wporg, zip, zip_dir, github_repo, external */
+if (!function_exists('upm_normalize_fav_type')) {
+	function upm_normalize_fav_type($t) {
+		$t = strtolower(trim((string)$t));
+		if (in_array($t, array('wporg','zip','zip_dir','github_repo'), true)) return $t;
+		if ($t === '' || in_array($t, array('third-party','third_party','premium','external'), true)) return 'external';
+		return 'external';
+	}
+}
+
+/** Resolve an external/premium favorite to a URL */
+if (!function_exists('upm_fav_external_url')) {
+	function upm_fav_external_url(array $fav) {
+		if (!empty($fav['url'])) return esc_url_raw($fav['url']);
+		$slug = trim((string)($fav['slug'] ?? ''));
+		if (!$slug) return '';
+		if (filter_var($slug, FILTER_VALIDATE_URL)) return esc_url_raw($slug);            // already a URL
+		if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/i', $slug)) return 'https://' . $slug;   // bare domain
+		return '';
+	}
 }
 
 /** Merge + normalize options */
@@ -57,8 +81,13 @@ function upm_get_settings() {
 		$merged[$k] = array_values(array_unique(array_filter($merged[$k], 'is_string')));
 	}
 
-	if (!is_array($merged['freeze'])) $merged['freeze'] = array();
-	if (!is_array($merged['notes']))  $merged['notes']  = array();
+	if (!is_array($merged['freeze']))  $merged['freeze']  = array();
+	if (!is_array($merged['notes']))   $merged['notes']   = array();
+	if (!isset($merged['github']) || !is_array($merged['github'])) {
+		$merged['github'] = array('token' => '');
+	} elseif (!array_key_exists('token', $merged['github'])) {
+		$merged['github']['token'] = '';
+	}
 
 	return $merged;
 }
@@ -67,20 +96,20 @@ function upm_get_settings() {
 function upm_effective_settings() {
 	if (!is_multisite()) return upm_get_settings();
 
-	$site = upm_get_settings();
-	$net  = get_site_option('upm_settings', array());
-	$netp = isset($net['network']['policy']) ? $net['network']['policy'] : array();
+	$site  = upm_get_settings();
+	$net   = get_site_option('upm_settings', array());
+	$netp  = isset($net['network']['policy']) ? $net['network']['policy'] : array();
 	$allow = isset($net['network']['allow_site_override']) ? $net['network']['allow_site_override'] : array();
 
 	$eff = $site;
 
 	foreach (array('protected','locked_on','locked_off') as $k) {
-		$eff[$k] = isset($netp[$k]) && is_array($netp[$k]) ? array_values(array_unique(array_merge($netp[$k], $site[$k]))) : $site[$k];
-		if (!empty($allow)) {
-			// If override not allowed for a plugin, force network setting by ensuring it exists (already unioned).
-			// (Advanced replacement logic can be added later.)
-		}
+		$eff[$k] = isset($netp[$k]) && is_array($netp[$k])
+			? array_values(array_unique(array_merge($netp[$k], $site[$k])))
+			: $site[$k];
+		// Future: if override not allowed for a plugin, enforce network value here.
 	}
+
 	if (isset($netp['freeze']) && is_array($netp['freeze'])) {
 		$eff['freeze'] = $netp['freeze'] + $site['freeze']; // network freeze wins
 	}
@@ -91,6 +120,7 @@ function upm_effective_settings() {
 /** Sanitize incoming settings */
 function upm_sanitize_settings($raw) {
 	$out = upm_get_settings();
+	$existing = upm_get_settings(); // for keeping GitHub token when blank
 
 	foreach (array('protected','locked_on','locked_off') as $k) {
 		$out[$k] = array();
@@ -131,44 +161,30 @@ function upm_sanitize_settings($raw) {
 		}
 	}
 
-	// Normalize Favorite Types
-	function upm_normalize_fav_type($t) {
-		$t = strtolower(trim((string)$t));
-		if (in_array($t, ['wporg','zip','zip_dir','github_repo'], true)) return $t;
-		if ($t === '' || in_array($t, ['third-party','third_party','premium','external'], true)) return 'external';
-		return 'external';
-	}
-	
-	// External URL Helper
-	function upm_fav_external_url(array $fav) {
-		if (!empty($fav['url'])) return esc_url_raw($fav['url']);
-		$slug = trim((string)($fav['slug'] ?? ''));
-		if (!$slug) return '';
-		// If slug already looks like a URL, use it; else treat as domain.
-		if (filter_var($slug, FILTER_VALIDATE_URL)) return esc_url_raw($slug);
-		if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/i', $slug)) return 'https://' . $slug;
-		return '';
-	}
-
-	// Sanitize Favorites
+	// Sanitize Favorites (DB-added; merged with file for display)
 	$out['favorites'] = array();
 	if (!empty($raw['favorites']) && is_array($raw['favorites'])) {
 		foreach ($raw['favorites'] as $fav) {
 			if (!is_array($fav)) continue;
-			$type = sanitize_key($fav['type'] ?? '');
-			$item = array('type' => $type, 'title' => sanitize_text_field($fav['title'] ?? ''));
-			if ($type === 'wporg')       $item['slug']   = sanitize_key($fav['slug'] ?? '');
-			if ($type === 'zip')         $item['url']    = esc_url_raw($fav['url'] ?? '');
-			if ($type === 'zip_dir')    { $item['dir']    = esc_url_raw($fav['dir'] ?? ''); $item['pattern'] = sanitize_text_field($fav['pattern'] ?? ''); }
-			if ($type === 'github_repo') { $item['repo']   = sanitize_text_field($fav['repo'] ?? ''); $item['channel'] = in_array(($fav['channel']??''), array('release','tag'), true) ? $fav['channel'] : 'release'; }
-			if (upm_normalize_fav_type($type) === 'external') { $item['url'] = esc_url_raw($fav['url'] ?? ''); $item['slug'] = sanitize_text_field($fav['slug'] ?? ''); }
+			$typeNorm = upm_normalize_fav_type($fav['type'] ?? '');
+			$item = array('type' => $typeNorm, 'title' => sanitize_text_field($fav['title'] ?? ''));
+			if ($typeNorm === 'wporg')       $item['slug']    = sanitize_key($fav['slug'] ?? '');
+			if ($typeNorm === 'zip')         $item['url']     = esc_url_raw($fav['url'] ?? '');
+			if ($typeNorm === 'zip_dir')    { $item['dir']    = esc_url_raw($fav['dir'] ?? ''); $item['pattern'] = sanitize_text_field($fav['pattern'] ?? ''); }
+			if ($typeNorm === 'github_repo') { $item['repo']   = sanitize_text_field($fav['repo'] ?? ''); $item['channel'] = in_array(($fav['channel']??''), array('release','tag'), true) ? $fav['channel'] : 'release'; }
+			if ($typeNorm === 'external')   { $item['url']    = esc_url_raw($fav['url'] ?? ''); $item['slug'] = sanitize_text_field($fav['slug'] ?? ''); }
 			$out['favorites'][] = $item;
 		}
 	}
 
-	$out['github']['token'] = isset($raw['github']['token'])
-		? sanitize_text_field($raw['github']['token'])
-		: '';
+	// GitHub token: keep existing if blank and `_keep` is present; otherwise update
+	$posted_keep  = isset($raw['github']['_keep']);
+	$posted_token = isset($raw['github']['token']) ? trim((string)$raw['github']['token']) : '';
+	if ($posted_keep && $posted_token === '') {
+		$out['github']['token'] = $existing['github']['token'] ?? '';
+	} else {
+		$out['github']['token'] = sanitize_text_field($posted_token);
+	}
 
 	// Conflict: cannot be both locked ON and OFF
 	$both = array_intersect($out['locked_on'], $out['locked_off']);
@@ -214,7 +230,5 @@ function upm_get_favorites() {
 	$settings = upm_get_settings();
 	$fileFavs = upm_favorites_from_file();
 	$dbFavs   = isset($settings['favorites']) && is_array($settings['favorites']) ? $settings['favorites'] : array();
-
-	// Simple merge: file first (version-controlled), then append DB (UI-added)
 	return array_values(array_merge($fileFavs, $dbFavs));
 }
