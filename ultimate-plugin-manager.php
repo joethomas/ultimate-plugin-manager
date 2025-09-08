@@ -2,7 +2,7 @@
 /*
 	Plugin Name: Ultimate Plugin Manager
 	Description: Lock down key plugins: prevent deactivate/delete, force auto-updates ON/OFF, freeze versions, rollback safely, and add admin notes—all from one screen.
-	Version: 0.3.1
+	Version: 0.3.2
 	Author: Joe Thomas
 	Author URI: https://localboost.com
 	Text Domain: ultimate-plugin-manager
